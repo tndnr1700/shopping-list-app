@@ -201,6 +201,7 @@
       .order('created_at', { ascending: true });
     if (error) {
       console.error('Failed to load items:', error);
+      render();
       return;
     }
     items = data;
@@ -248,7 +249,6 @@
   async function addItem() {
     const value = inputEl.value.trim();
     if (!value) return;
-    inputEl.value = '';
     const { error } = await db
       .from('shopping_items')
       .insert({ name: value, checked: false });
@@ -256,6 +256,7 @@
       console.error('Failed to add item:', error);
       return;
     }
+    inputEl.value = '';
     await loadItems();
     inputEl.focus();
   }
