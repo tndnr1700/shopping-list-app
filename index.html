@@ -178,9 +178,12 @@
     <div class="empty" id="emptyMsg" style="display:none;">아직 담긴 항목이 없어요</div>
   </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 (function () {
-  const STORAGE_KEY = 'shopping-list-items';
+  const SUPABASE_URL = 'https://qjhczovgzqursyrqumbq.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_3PcKIF0t16RZH6vym0GBjQ_TDEDHQrI';
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   const listEl = document.getElementById('list');
   const inputEl = document.getElementById('itemInput');
@@ -189,21 +192,19 @@
   const emptyMsg = document.getElementById('emptyMsg');
   const clearCheckedBtn = document.getElementById('clearCheckedBtn');
 
-  let items = loadItems();
+  let items = [];
 
-  function loadItems() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      return [];
+  async function loadItems() {
+    const { data, error } = await db
+      .from('shopping_items')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if (error) {
+      console.error('Failed to load items:', error);
+      return;
     }
-  }
-
-  function saveItems() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    } catch (e) {}
+    items = data;
+    render();
   }
 
   function render() {
@@ -244,35 +245,57 @@
     statsText.textContent = items.length + '개 항목 · ' + checkedCount + '개 완료';
   }
 
-  function addItem() {
+  async function addItem() {
     const value = inputEl.value.trim();
     if (!value) return;
-    items.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2), name: value, checked: false });
     inputEl.value = '';
-    saveItems();
-    render();
+    const { error } = await db
+      .from('shopping_items')
+      .insert({ name: value, checked: false });
+    if (error) {
+      console.error('Failed to add item:', error);
+      return;
+    }
+    await loadItems();
     inputEl.focus();
   }
 
-  function toggleItem(id) {
+  async function toggleItem(id) {
     const item = items.find(function (i) { return i.id === id; });
-    if (item) {
-      item.checked = !item.checked;
-      saveItems();
-      render();
+    if (!item) return;
+    const { error } = await db
+      .from('shopping_items')
+      .update({ checked: !item.checked })
+      .eq('id', id);
+    if (error) {
+      console.error('Failed to update item:', error);
+      return;
     }
+    await loadItems();
   }
 
-  function deleteItem(id) {
-    items = items.filter(function (i) { return i.id !== id; });
-    saveItems();
-    render();
+  async function deleteItem(id) {
+    const { error } = await db
+      .from('shopping_items')
+      .delete()
+      .eq('id', id);
+    if (error) {
+      console.error('Failed to delete item:', error);
+      return;
+    }
+    await loadItems();
   }
 
-  function clearChecked() {
-    items = items.filter(function (i) { return !i.checked; });
-    saveItems();
-    render();
+  async function clearChecked() {
+    const { error } = await db
+      .from('shopping_items')
+      .delete()
+      .eq('checked', true);
+    if (error) {
+      console.error('Failed to clear checked items:', error);
+      return;
+    }
+    await loadItems();
   }
 
   addBtn.addEventListener('click', addItem);
@@ -281,7 +304,7 @@
   });
   clearCheckedBtn.addEventListener('click', clearChecked);
 
-  render();
+  loadItems();
 })();
 </script>
 </body>
